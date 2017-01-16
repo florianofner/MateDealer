@@ -735,7 +735,8 @@ void mdb_vend(void) {
             state = 0;
             mdb_state = MDB_ENABLED;
             mdb_active_cmd = MDB_IDLE;
-            mdb_poll_reply = MDB_REPLY_ACK;
+            //mdb_poll_reply = MDB_REPLY_ACK; //this isn't standard and doesn't work on Royal G-III machines.
+			mdb_poll_reply = MDB_REPLY_END_SESSION; //we need to do this instead of just ACK, to follow the standard.
             return;
         break; 
     }
