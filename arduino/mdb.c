@@ -50,7 +50,7 @@ mdbSession_t session = {
 };
 
 void mdb_cmd_handler(void) {
-            
+
     switch(mdb_active_cmd) {
     
         case MDB_IDLE:
@@ -97,34 +97,34 @@ void mdb_cmd_handler(void) {
 void mdb_reset(void) {
     
     // Wait for enough data in buffer to proceed reset
-	if(buffer_level(MDB_USART,RX) < 2) return; 
+    if(buffer_level(MDB_USART,RX) < 2) return; 
 
     #if DEBUG == 1
     send_str_p(UPLINK_USART, PSTR("RESET\r\n"));
     #endif
     
     // validate checksum
-	if(recv_mdb(MDB_USART) != MDB_RESET) {
-		mdb_active_cmd = MDB_IDLE;
-		mdb_poll_reply = MDB_REPLY_ACK;
+    if(recv_mdb(MDB_USART) != MDB_RESET) {
+        mdb_active_cmd = MDB_IDLE;
+        mdb_poll_reply = MDB_REPLY_ACK;
         send_str_p(UPLINK_USART,PSTR("Error: invalid checksum for [RESET]\r\n"));
-		return;
-	}
+        return;
+    }
 
-	// Reset everything
-	vmc.feature_level = 0;
-	vmc.dispaly_cols = 0;
-	vmc.dispaly_rows = 0;
-	vmc.dispaly_info = 0;
-	price.max = 0;
-	price.min = 0;
+    // Reset everything
+    vmc.feature_level = 0;
+    vmc.dispaly_cols = 0;
+    vmc.dispaly_rows = 0;
+    vmc.dispaly_info = 0;
+    price.max = 0;
+    price.min = 0;
 
     // Send ACK
     send_mdb(MDB_USART, 0x100);
     reset_done = TRUE;
     mdb_state = MDB_INACTIVE;
     mdb_active_cmd = MDB_IDLE;
-	mdb_poll_reply = MDB_REPLY_JUST_RESET;
+    mdb_poll_reply = MDB_REPLY_JUST_RESET;
 }
 
 void mdb_setup(void) {
@@ -135,41 +135,41 @@ void mdb_setup(void) {
     uint8_t index = 0;
     
     if(state < 2) {
-    	// Wait for enough data in buffer
-		if(buffer_level(MDB_USART,RX) < 12) return; 
-		
+        // Wait for enough data in buffer
+        if(buffer_level(MDB_USART,RX) < 12) return; 
+        
         // fetch the data from buffer
-		for(index = 0; index < 6; index++) {
+        for(index = 0; index < 6; index++) {
             data[index] = (uint8_t) recv_mdb(MDB_USART);
         }
-		
-		// calculate checksum
-		checksum += data[0] + data[1] + data[2] + data[3] + data[4];
+        
+        // calculate checksum
+        checksum += data[0] + data[1] + data[2] + data[3] + data[4];
         checksum = checksum & 0xFF;
         
         // validate checksum
-		if(checksum != data[5]) {
+        if(checksum != data[5]) {
             state = 0;
-			mdb_active_cmd = MDB_IDLE;
-			mdb_poll_reply = MDB_REPLY_ACK;
-			checksum = MDB_SETUP;
+            mdb_active_cmd = MDB_IDLE;
+            mdb_poll_reply = MDB_REPLY_ACK;
+            checksum = MDB_SETUP;
             send_str_p(UPLINK_USART,PSTR("Error: invalid checksum [SETUP]\r\n"));
-			return;  
-		}
-		state = data[0];
-	}	
+            return;  
+        }
+        state = data[0];
+    }    
 
-	// Switch setup state
-	switch(state) {
-		
+    // Switch setup state
+    switch(state) {
+        
         // Stage 1 - config Data
-		case 0:
+        case 0:
             
             #if DEBUG == 1
             send_str_p(UPLINK_USART, PSTR("SETUP STAGE 1\r\n"));
             #endif
             
-			// store VMC configuration data
+            // store VMC configuration data
             vmc.feature_level = data[1];
             vmc.dispaly_cols  = data[2];
             vmc.dispaly_rows  = data[3];
@@ -202,10 +202,10 @@ void mdb_setup(void) {
             checksum = MDB_SETUP;
             return;
             
-		break;
+        break;
 
         // Stage 2 - price data
-		case 1:
+        case 1:
         
             #if DEBUG == 1
             send_str_p(UPLINK_USART, PSTR("SETUP STAGE 2\r\n"));
@@ -215,8 +215,8 @@ void mdb_setup(void) {
             price.max = (data[1] << 8) | data[2];
             price.min = (data[3] << 8) | data[4];
 
-	        // send ACK
-	        send_mdb(MDB_USART, 0x100);
+            // send ACK
+            send_mdb(MDB_USART, 0x100);
 
             // Set MDB State
             //mdb_state = MDB_DISABLED; //this is to-spec.
@@ -228,10 +228,10 @@ void mdb_setup(void) {
             mdb_active_cmd = MDB_IDLE;
             mdb_poll_reply = MDB_REPLY_ACK;
             return;
-		break;
+        break;
 
         // ACK from VMC for MateDealer cfg data
-		case 2:
+        case 2:
             // Wait for enough data in buffer
             if(buffer_level(MDB_USART,RX) < 2) return; 
             
@@ -239,8 +239,8 @@ void mdb_setup(void) {
             send_str_p(UPLINK_USART, PSTR("SETUP WAIT FOR ACK\r\n"));
             #endif
             
-			// Check if VMC sent ACK
-			data[0] = recv_mdb(MDB_USART);
+            // Check if VMC sent ACK
+            data[0] = recv_mdb(MDB_USART);
             
             /*
              * The following check if VMC answers with ACK to the Setup data we send is not as in the MDB Spec defined.
@@ -249,28 +249,28 @@ void mdb_setup(void) {
              */
 
             if(data[0] != 0x000 && data[0] != 0x001) {
-				state = 0;
-				mdb_active_cmd = MDB_IDLE;
-				mdb_poll_reply = MDB_REPLY_ACK;
-				send_str_p(UPLINK_USART,PSTR("Error: no ACK received on [SETUP]"));
+                state = 0;
+                mdb_active_cmd = MDB_IDLE;
+                mdb_poll_reply = MDB_REPLY_ACK;
+                send_str_p(UPLINK_USART,PSTR("Error: no ACK received on [SETUP]"));
                 return;    
-			}
+            }
             
             state = 0;
-			mdb_active_cmd = MDB_IDLE;
-			mdb_poll_reply = MDB_REPLY_ACK;
-			return;
-		break;
+            mdb_active_cmd = MDB_IDLE;
+            mdb_poll_reply = MDB_REPLY_ACK;
+            return;
+        break;
 
-		// Unknown Subcommand from VMC
-		default:
+        // Unknown Subcommand from VMC
+        default:
             send_str_p(UPLINK_USART,PSTR("Error: unknown subcommand [SETUP]\r\n"));
             state = 0;
             mdb_active_cmd = MDB_IDLE;
             mdb_poll_reply = MDB_REPLY_ACK;
             return;
         break;
-	}
+    }
 }
 
 void mdb_poll(void) {
@@ -283,7 +283,7 @@ void mdb_poll(void) {
         if(buffer_level(MDB_USART,RX) < 2) return; 
         
         #if DEBUG == 1
-        send_str_p(UPLINK_USART, PSTR("POLL\r\n"));
+        //send_str_p(UPLINK_USART, PSTR("POLL\r\n"));
         #endif
         
         // validate checksum
@@ -339,7 +339,7 @@ void mdb_poll(void) {
         break;
 
         case MDB_REPLY_DISPLAY_REQ:
-            // not yet implemented			
+            // not yet implemented            
         break;
 
         case MDB_REPLY_BEGIN_SESSION:
