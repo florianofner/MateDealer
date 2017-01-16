@@ -87,6 +87,10 @@ void mdb_cmd_handler(void) {
         case MDB_READER:
             mdb_reader();
         break;
+
+        default:
+            send_str_p(UPLINK_USART, PSTR("unknown state?\r\n"));
+        break;
     }
 }
 
