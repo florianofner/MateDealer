@@ -219,7 +219,8 @@ void mdb_setup(void) {
 	        send_mdb(MDB_USART, 0x100);
 
             // Set MDB State
-            mdb_state = MDB_DISABLED;
+            //mdb_state = MDB_DISABLED; //this is to-spec.
+			mdb_state = MDB_ENABLED; //This violates the spec but causes the reader to start working on Royal G-III machines.
 
             state = 0;
             
