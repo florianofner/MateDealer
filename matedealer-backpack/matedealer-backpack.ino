@@ -7,7 +7,7 @@
 #include <WiFiUdp.h>
 #include <ArduinoOTA.h>
 
-#define VERSION 4
+#define VERSION 5
 
 HTTPClient http;
 ESP8266WebServer httpd(80);
@@ -44,7 +44,14 @@ String spiffsRead(String path) {
 bool requestIsAuthorized() {
 	return ( httpd.client().remoteIP().toString() == "10.56.0.11" );
 }
-		
+void send302(String dest) {
+	httpd.sendHeader("Location", dest, true);
+	httpd.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+	httpd.sendHeader("Pragma", "no-cache");
+	httpd.sendHeader("Expires", "-1");
+	httpd.send ( 302, "text/plain", "");
+	httpd.client().stop();
+}		
 
 void setup()
 {
@@ -135,6 +142,42 @@ void setup()
 		httpd.send(200, "text/html", header);
 		httpd.client().stop();
 	});
+	httpd.on("/debug", [&](){
+		String content = header;
+		content += ("<h1>Debug</h1><ul>");
+
+		unsigned long uptime = millis();
+		content += (String("<li>Version ") + VERSION + "</li>");
+		content += (String("<li>Booted about ") + (uptime/60000) + " minutes ago (" + ESP.getResetReason() + ")</li>");
+		content += (String("<li>Raw Vcc: ") + ESP.getVcc() + ")</li>");
+		content += ("</ul>");
+	
+		content += (R"(
+			<h2>Debugging buttons</h2>
+			<form method="POST" action="/debug/start-session">
+				<button type="submit">start-session 1337</button>
+			</form>
+			<form method='POST' action='/debug/approve-vend'>
+				<button type='submit'>approve-vend</button>
+			</form>
+			<form method="POST" action="/debug/deny-vend">
+				<button type="submit">deny-vend</button>
+			</form>
+		)");
+		httpd.send(200, "text/html", content);
+	});
+	httpd.on("/debug/start-session", [&](){
+		Serial.println("start-session 1337");
+		send302("/debug?done");
+	});
+	httpd.on("/debug/approve-vend", [&](){
+		Serial.println("approve-vend");
+		send302("/debug?done");
+	});
+	httpd.on("/debug/deny-vend", [&](){
+		Serial.println("deny-vend");
+		send302("/debug?done");
+	});
 	httpd.begin();
 
         Serial.print("Loading token from disk... ");
@@ -157,7 +200,9 @@ void setup()
 
 	Serial.println("Startup complete. Shifting bitrate and starting interface to atmega.");
 	delay(500);
-	//Serial.begin(38400);
+	Serial.end();
+	delay(500);
+	Serial.begin(38400);
 	//Serial.swap();
 }
 
