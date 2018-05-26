@@ -11,7 +11,11 @@
 
 HTTPClient http;
 ESP8266WebServer httpd(80);
+WiFiUDP udp;
+IPAddress ip(10,56,1,188);
+const char bufferTest[] = "Boot complete.";
 
+char buffer[255];
 String token = "";
 
 const char * header = R"(<!DOCTYPE html>
@@ -204,6 +208,10 @@ void setup()
 	delay(500);
 	Serial.begin(38400);
 	//Serial.swap();
+
+	udp.beginPacket(ip,12345);
+	udp.write(bufferTest);
+	udp.endPacket();
 }
 
 void loop()
@@ -211,6 +219,25 @@ void loop()
 	
 	ArduinoOTA.handle();
 	httpd.handleClient();
+
+	if ( Serial.available() ) {
+        String command = Serial.readString();
+
+        command.toCharArray(buffer, 254);
+		udp.beginPacket(ip, 12345);
+		udp.write(buffer);
+		udp.endPacket();
+
+        if ( command.indexOf("vend-request") > 0 ) {
+            //Send the charge request
+            if ( false ) {
+                //Charge succeeded, approve the vend
+		        Serial.println("approve-vend");
+            } else {
+                Serial.println("deny-vend");
+            }
+        } 
+	}
 
 }
 
