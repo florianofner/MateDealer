@@ -318,10 +318,12 @@ void loop()
             //found a tag
 
             nfcID = sha1(nfcID);
-
             debugLog(nfcID);
 
-            Serial.println(String("start-session ") + String(getBalanceForAccount(getUserIDForTag(nfcID)) * 100));
+            currentUserID = getUserIDForTag(nfcID);
+            debugLog(currentUserID);
+
+            Serial.println(String("start-session ") + String((int) (getBalanceForAccount(currentUserID) * 100) ) );
         }
     } else {
         nfcReaderInitialized = false;
