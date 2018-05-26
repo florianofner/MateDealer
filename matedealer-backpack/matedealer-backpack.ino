@@ -6,9 +6,12 @@
 #include <ESP8266mDNS.h>
 #include <WiFiUdp.h>
 #include <ArduinoOTA.h>
+#include <Wire.h>
 #include <Adafruit_PN532.h>
+#include <ArduinoJson.h>
+#include <Hash.h>
 
-#define VERSION 5
+#define VERSION 7
 #define IO_PN532_SS     (D4)
 
 //   MOSI <---> D7
@@ -23,7 +26,6 @@ HTTPClient http;
 ESP8266WebServer httpd(80);
 WiFiUDP udp;
 IPAddress ip(10,56,1,188);
-const char bufferTest[] = "Boot complete.";
 
 char buffer[255];
 String token = "";
@@ -67,6 +69,12 @@ void send302(String dest) {
     httpd.send ( 302, "text/plain", "");
     httpd.client().stop();
 }        
+void debugLog(String thing) {
+    thing.toCharArray(buffer, 254);
+    udp.beginPacket(ip,12345);
+    udp.write(buffer);
+    udp.endPacket();
+}
 
 void setup()
 {
@@ -214,6 +222,9 @@ void setup()
             <form method="POST" action="/debug/deny-vend">
                 <button type="submit">deny-vend</button>
             </form>
+            <form method="POST" action="/debug/getUserIDForTag">
+                <button type="submit">getUserIDForTag dd176028e25d75049d89cd6b3adc75d21133ccab</button>
+            </form>
         )");
         httpd.send(200, "text/html", content);
     });
@@ -228,6 +239,11 @@ void setup()
     httpd.on("/debug/deny-vend", [&](){
         Serial.println("deny-vend");
         send302("/debug?done");
+    });
+    httpd.on("/debug/getUserIDForTag", [&](){
+        String userID = getUserIDForTag("dd176028e25d75049d89cd6b3adc75d21133ccab");
+        debugLog(userID);
+        httpd.send(200, "text/plain", userID);
     });
     httpd.begin();
 
@@ -265,9 +281,7 @@ void setup()
     Serial.begin(38400);
     //Serial.swap();
 
-    udp.beginPacket(ip,12345);
-    udp.write(bufferTest);
-    udp.endPacket();
+    debugLog("Boot complete.");
 }
 
 void loop()
@@ -279,15 +293,13 @@ void loop()
     if ( Serial.available() ) {
         String command = Serial.readString();
 
-        command.toCharArray(buffer, 254);
-        udp.beginPacket(ip, 12345);
-        udp.write(buffer);
-        udp.endPacket();
+        debugLog(command);
 
         if ( command.indexOf("vend-request") > -1 ) {
             //Send the charge request
             if ( chargeAccount(currentUserID, 0.50) ) {
                 //Charge succeeded, approve the vend
+                //TODO: We should charge the amount that is set on the soda machine
                 Serial.println("approve-vend");
             } else {
                 Serial.println("deny-vend");
@@ -304,16 +316,16 @@ void loop()
         String nfcID = checkNFC();
         if ( nfcID.length() > 0 ) {
             //found a tag
-            nfcID.toCharArray(buffer, 254);
-            udp.beginPacket(ip, 12345);
-            udp.write(buffer);
-            udp.endPacket();
+
+            nfcID = sha1(nfcID);
+
+            debugLog(nfcID);
 
             Serial.println(String("start-session ") + String(getBalanceForAccount(getUserIDForTag(nfcID)) * 100));
         }
     } else {
         nfcReaderInitialized = false;
-        delay(1000);
+        //delay(1000);
     }
 
 }
@@ -351,15 +363,6 @@ String hexlify(uint8_t byte) {
     return hexedString;
 }
 
-void determineCurrentState() {
-    if (isDoorClosed()) {
-        lockDoor();
-        currentState = DOOR_CLOSED_AND_LOCKED;
-    } else {
-        unlockDoor();
-        currentState = DOOR_OPEN_AND_UNLOCKED;
-    }
-}
 bool initializeNFCReader() {
     if ( isNFCReaderPresent() ) {
         nfc.setPassiveActivationRetries(0xFE);
@@ -377,3 +380,30 @@ bool isNFCReaderPresent() {
     return false;
 }
 
+String getUserIDForTag(String nfcID) {
+    String uid = "";
+    //You can't use the begin(url) construct because it always assumes port 80, apparently
+    //https://github.com/esp8266/Arduino/blob/master/libraries/ESP8266HTTPClient/src/ESP8266HTTPClient.cpp#L172
+    //at the time of this writing: "_port = 80;"
+    http.begin("10.56.0.11", 8080, String("/ldap?nfcid=") + nfcID);
+    int code = http.GET();
+    if ( code > 0 ) {
+        const size_t bufferSize = 10*JSON_ARRAY_SIZE(1) + 2*JSON_ARRAY_SIZE(2) + JSON_ARRAY_SIZE(3) + JSON_OBJECT_SIZE(11) + 3570;
+        DynamicJsonBuffer jsonBuffer(bufferSize);
+        JsonArray& root = jsonBuffer.parseArray(http.getString());
+        const char * c_uid = root[0][1]["uid"][0];
+        uid = c_uid;
+    } else {
+        debugLog(http.errorToString(code));
+    }
+    return uid;
+}
+
+double getBalanceForAccount(String uid) {
+    //TODO
+    return 13.37;
+}
+
+bool chargeAccount(String uid, double amount) {
+    return false;
+}
