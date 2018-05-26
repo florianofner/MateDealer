@@ -59,7 +59,8 @@ void send302(String dest) {
 
 void setup()
 {
-	Serial.begin(115200);
+	//Serial.begin(115200);
+	Serial.begin(38400);
 	Serial.println();
 	delay(200);
 	Serial.print("MateDealer BACKPACK v"); Serial.println(VERSION);
