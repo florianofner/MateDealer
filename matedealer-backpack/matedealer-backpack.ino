@@ -147,6 +147,41 @@ void setup()
 		httpd.send(200, "text/html", header);
 		httpd.client().stop();
 	});
+    httpd.on("/update", HTTP_POST, [&](){
+        httpd.sendHeader("Connection", "close");
+        httpd.sendHeader("Access-Control-Allow-Origin", "*");
+        httpd.send(200, "text/plain", (Update.hasError())?"FAIL":"OK");
+    },[&](){
+        // handler for the file upload, get's the sketch bytes, and writes
+        // them through the Update object
+        HTTPUpload& upload = httpd.upload();
+        if(upload.status == UPLOAD_FILE_START){
+            Serial.printf("Starting HTTP update from %s - other functions will be suspended.\r\n", upload.filename.c_str());
+            WiFiUDP::stopAll();
+
+            uint32_t maxSketchSpace = (ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000;
+            if(!Update.begin(maxSketchSpace)){//start with max available size
+                Update.printError(Serial);
+            }
+        } else if(upload.status == UPLOAD_FILE_WRITE){
+            Serial.print(upload.totalSize); Serial.printf(" bytes written\r");
+
+            if(Update.write(upload.buf, upload.currentSize) != upload.currentSize){
+                Update.printError(Serial);
+            }
+        } else if(upload.status == UPLOAD_FILE_END){
+            if(Update.end(true)){ //true to set the size to the current progress
+                Serial.printf("Update Success: %u\n", upload.totalSize);
+                ESP.restart();
+            } else {
+                Update.printError(Serial);
+            }
+        } else if(upload.status == UPLOAD_FILE_ABORTED){
+            Update.end();
+            Serial.println("Update was aborted");
+        }
+        delay(0);
+    });
 	httpd.on("/debug", [&](){
 		String content = header;
 		content += ("<h1>Debug</h1><ul>");
